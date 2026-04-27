@@ -1442,7 +1442,7 @@
             </div>
         </div>
 
-        <!-- 管理员模式：评估结果报告 -->
+        <!-- 管理员模式：评估结果报告（密码验证后显示） -->
         <div id="step5AdminMode" style="display:none;">
             <div class="section-title">
                 评估结果与提交
@@ -1494,7 +1494,7 @@
     </div>
 
     <!-- Step 6: 投资预算（内部资料，评估人不可见） -->
-    <div class="form-section" id="step6" style="display:none;">
+    <div class="form-section" id="step6">
         <div class="section-title">
             💰 投资预算明细
             <span class="badge">第6步 · 内部</span>
@@ -1659,7 +1659,7 @@
     </div>
 
     <!-- Step 7: 投资回报测算（内部资料，评估人不可见） -->
-    <div class="form-section" id="step7" style="display:none;">
+    <div class="form-section" id="step7">
         <div class="section-title">
             📈 投资回报测算
             <span class="badge">第7步 · 内部</span>
@@ -1842,12 +1842,12 @@
 
 <script>
     let currentStep = 1;
-    const totalSteps = 5;  // 评估人只走5步，第6/7步为内部资料
+    const totalSteps = 5;  // 评估人只走5步
     const internalTotalSteps = 7;  // 含内部步骤的总数
     let storeType = '';
     let submitted = false;
-    let isAdminMode = false;  // 后台模式标记
-    let budgetUnlocked = false; // 投资预算内部权限是否已解锁
+    let isAdminMode = false;  // 密码验证通过后解锁
+    let budgetUnlocked = false;
 
 // === Temple Database (本地寺院数据库 · 100条 · 2026-04-24更新) ===
     // 级别标准：百度百科/官方分类（世界遗产 > 全国重点寺院/文保 > 省级重点 > 市级/一般）
@@ -2189,15 +2189,16 @@
         document.getElementById('prevBtn').style.visibility = currentStep > 1 ? 'visible' : 'hidden';
         var nextBtn = document.getElementById('nextBtn');
         if (currentStep === totalSteps && !isAdminMode) {
-            // 评估人：最后一步显示提交按钮，隐藏导航
+            // 评估人：最后一步，隐藏导航（等待提交）
             document.getElementById('btnGroup').style.display = 'none';
         } else if (currentStep === internalTotalSteps && isAdminMode) {
-            nextBtn.textContent = '📩 提交选址评估';
-            nextBtn.className = 'btn btn-submit';
-        } else if (currentStep === 5) {
+            // 管理员：最后一步
+            document.getElementById('btnGroup').style.display = 'none';
+        } else if (currentStep === 5 && isAdminMode) {
             nextBtn.textContent = '💰 下一步：投资预算';
             nextBtn.className = 'btn btn-primary';
-        } else if (currentStep === 6) {
+            document.getElementById('btnGroup').style.display = '';
+        } else if (currentStep === 6 && isAdminMode) {
             nextBtn.textContent = '📈 下一步：投资回报测算';
             nextBtn.className = 'btn btn-primary';
         } else {
@@ -2207,8 +2208,19 @@
     }
 
     function showStep(step) {
-        document.querySelectorAll('.form-section').forEach(s => s.classList.remove('visible'));
-        document.getElementById('step' + step).classList.add('visible');
+        // 隐藏所有step（1-7），用inline style确保优先级最高
+        for (var i = 1; i <= 7; i++) {
+            var el = document.getElementById('step' + i);
+            if (el) {
+                el.style.display = 'none';
+                el.classList.remove('visible');
+            }
+        }
+        // 显示目标step
+        var target = document.getElementById('step' + step);
+        if (target) {
+            target.style.display = 'block';
+        }
         updateProgress();
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -2274,33 +2286,87 @@
         }
     }
 
+    // 提交成功后弹出的管理员密码验证弹窗
+    function showAdminPasswordModal() {
+        var modal = document.createElement('div');
+        modal.id = 'adminPwdModal';
+        modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;';
+        modal.innerHTML =
+            '<div style="background:#fff;border-radius:16px;padding:28px 24px;width:90%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.3);">' +
+            '<div style="text-align:center;margin-bottom:16px;">' +
+            '<div style="font-size:40px;margin-bottom:8px;">🔐</div>' +
+            '<div style="font-size:17px;font-weight:700;color:#1a3a2a;">查看评估报告</div>' +
+            '<div style="font-size:13px;color:#86868b;margin-top:6px;">评估已提交成功！如需查看评估报告及投资预算，请输入管理密码</div>' +
+            '</div>' +
+            '<input type="password" id="adminPwdInput" placeholder="请输入管理密码" style="width:100%;padding:12px 14px;border:2px solid #e0dcd4;border-radius:10px;font-size:15px;outline:none;box-sizing:border-box;text-align:center;letter-spacing:2px;" onkeydown="if(event.key===\'Enter\')checkAdminPassword()">' +
+            '<div id="adminPwdError" style="font-size:12px;color:#b04040;margin-top:8px;text-align:center;display:none;">密码错误，请重试</div>' +
+            '<div style="display:flex;gap:10px;margin-top:18px;">' +
+            '<button onclick="document.getElementById(\'adminPwdModal\').remove()" style="flex:1;padding:12px;border:1px solid #e0dcd4;border-radius:10px;background:#fff;color:#666;font-size:14px;cursor:pointer;">关闭</button>' +
+            '<button onclick="checkAdminPassword()" style="flex:1;padding:12px;border:none;border-radius:10px;background:linear-gradient(90deg,#1a3a2a,#2d5a3f);color:white;font-size:14px;cursor:pointer;font-weight:600;">查看报告</button>' +
+            '</div>' +
+            '</div>';
+        document.body.appendChild(modal);
+        setTimeout(function() { document.getElementById('adminPwdInput').focus(); }, 100);
+    }
+
+    // 管理员密码验证通过 → 解锁报告和后续步骤
+    function checkAdminPassword() {
+        var pwd = document.getElementById('adminPwdInput') ? document.getElementById('adminPwdInput').value : '';
+        if (pwd === 'yy2026') {
+            // 密码正确，解锁管理员模式
+            isAdminMode = true;
+            budgetUnlocked = true;
+            document.getElementById('adminPwdModal').remove();
+            // 隐藏成功提示，显示报告
+            document.getElementById('successMsg').style.display = 'none';
+            document.querySelector('.progress-wrap').style.display = '';
+            // 确保step5 section可见
+            currentStep = 5;
+            showStep(5);
+            // 切换 Step5 为管理员模式（评分报告）
+            document.getElementById('step5GuestMode').style.display = 'none';
+            document.getElementById('step5AdminMode').style.display = '';
+            // 隐藏提交按钮区域（已提交完毕）
+            var submitBtnEl = document.getElementById('submitBtn');
+            if (submitBtnEl && submitBtnEl.parentElement) submitBtnEl.parentElement.style.display = 'none';
+            // 生成评分报告
+            buildStep5();
+            // 显示导航按钮
+            document.getElementById('btnGroup').style.display = '';
+            updateProgress();
+            showToast('✅ 验证通过，已查看评估报告');
+        } else {
+            document.getElementById('adminPwdError').style.display = 'block';
+            document.getElementById('adminPwdInput').value = '';
+            document.getElementById('adminPwdInput').focus();
+        }
+    }
+
     function nextStep() {
         if (currentStep === totalSteps && !isAdminMode) {
-            // 评估人：最后一步，滚动到提交按钮
+            // 评估人：滚动到提交按钮
             var submitBtn = document.getElementById('submitBtn');
             if (submitBtn) submitBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
             return;
         }
         if (currentStep === internalTotalSteps && isAdminMode) {
-            // 后台模式最后一步
-            var submitBtn2 = document.getElementById('submitBtn');
-            if (submitBtn2) submitBtn2.scrollIntoView({ behavior: 'smooth', block: 'center' });
             return;
         }
         if (!validateStep(currentStep)) return;
         if (currentStep === 4 && !isAdminMode) {
-            // 评估人：第4步→第5步（提交页），生成摘要
             buildSubmitSummary();
         }
         if (currentStep === 4 && isAdminMode) {
-            buildStep5();  // 后台模式仍生成评分报告
+            buildStep5();
         }
         if (currentStep === 5 && isAdminMode) {
-            // 后台模式：进入投资预算前需要口令
+            // 进入投资预算前需要口令
             if (!budgetUnlocked) {
                 showPasswordModal();
                 return;
             }
+            // 口令已验证，构建投资预算表单（预填标准值）
+            buildBudgetForm();
         }
         if (currentStep === 6 && isAdminMode) {
             buildROIForm();
@@ -2829,7 +2895,7 @@
         const el = document.getElementById('reportHighlights');
         if (highlights.length === 0) {
             el.innerHTML = '';
-            return;
+            return highlights; // 返回空数组
         }
         const show = highlights.slice(0, 6);
         el.innerHTML = `<div class="highlights-card"><h3>✨ 该铺位核心优势</h3>
@@ -2838,6 +2904,7 @@
                 <div class="highlight-text">${h.text}<span class="tag ${h.tagClass}">${h.tag}</span></div>
             </div>`).join('')}
         </div>`;
+        return highlights; // 返回完整数组供邮件报告使用
     }
 
     // === 生成风险提示（含一叶解决方案）===
@@ -2925,6 +2992,7 @@
                 </div>
             </div>`).join('')}
         </div>`;
+        return risks; // 返回数组供邮件报告使用
     }
 
     // === Build Submit Summary (评估人提交页摘要) ===
@@ -3474,6 +3542,11 @@
         const budgetReserve = parseFloat(document.getElementById('bud_reserve')?.value) || 0;
         const fixedInvest = budgetTotal - budgetDeposit - budgetRentDeposit - budgetReserve;
         document.getElementById('roi_totalInvest').value = fixedInvest > 0 ? fixedInvest.toFixed(1) : '';
+
+        // 自动触发一次计算（如果参数齐全）
+        if (n('roi_avgPrice') && n('roi_dailyFlow') && n('roi_totalInvest')) {
+            calcROI();
+        }
     }
 
     // 核心计算函数
@@ -3819,43 +3892,170 @@
         // 确定等级
         let levelText = '';
         if (storeType === 'temple') {
-            if (fullScore >= 90) levelText = '🏆 顶级优质铺位';
-            else if (fullScore >= 80) levelText = '✅ 优质铺位';
-            else levelText = '❌ 不推荐';
+            if (fullScore >= 90) levelText = '顶级优质铺位';
+            else if (fullScore >= 80) levelText = '优质铺位';
+            else levelText = '不推荐';
         } else {
-            if (scores.total >= 85) levelText = '🟢 A级铺位';
-            else if (scores.total >= 70) levelText = '🟡 B级铺位';
-            else levelText = '🔴 C级铺位';
+            if (scores.total >= 85) levelText = 'A级铺位';
+            else if (scores.total >= 70) levelText = 'B级铺位';
+            else levelText = 'C级铺位';
         }
         data.score = displayScore;
         data.scoreLevel = levelText;
-        // 各维度得分明细
-        data.scoreBreakdown = scores.dimensions.map(d => `${d.group}/${d.name}: ${d.score}/${d.max}`).join(' | ');
 
-        // 构建邮件内容摘要
+        // 按维度分组
+        const dimGroups = {};
+        scores.dimensions.forEach(function(d) {
+            const g = d.group || '其他';
+            if (!dimGroups[g]) dimGroups[g] = [];
+            dimGroups[g].push(d);
+        });
+
+        // 构建结构化邮件（Web3Forms仅支持纯文本，用分隔线和缩进让报告清晰易读）
         const storeTypeMap = { temple: '寺院店', shop_in_shop: '店中店', commercial: '商圈店' };
         const storeTypeText = storeTypeMap[data.storeType] || data.storeType;
-        const summary = `【一叶一世界选址评估】\n` +
-            `店型：${storeTypeText}\n` +
-            `名称：${data.storeName}\n` +
-            `城市：${data.city}\n` +
-            `面积：${data.area || '-'}㎡\n` +
-            `租金：${data.rent || '-'}万/月\n` +
-            `联系人：${data.contactName}\n` +
-            `电话：${data.contactPhone}\n` +
-            `地址：${data.address || '-'}\n` +
-            `评估评分：${displayScore}分 ${levelText}\n` +
-            `评分明细：${data.scoreBreakdown}\n` +
-            `备注：${data.notes || '-'}\n\n` +
-            `完整数据（JSON）：\n${JSON.stringify(data, null, 2)}`;
+        // HTML标签清除工具
+        function stripHtml(html) { return html ? html.replace(/<[^>]*>/g, '') : ''; }
 
-        // 发送邮件（Web3Forms）
+        let reportLines = [];
+        reportLines.push('══════════════════════════════════════');
+        reportLines.push('  一叶一世界 · 选址评估报告');
+        reportLines.push('══════════════════════════════════════');
+        reportLines.push('');
+        reportLines.push('  评分：' + displayScore + ' 分 ｜ 等级：' + levelText);
+        reportLines.push('──────────────────────────────────────');
+        reportLines.push('');
+
+        // 信息摘要
+        reportLines.push('【信息摘要】');
+        reportLines.push('  店型：' + storeTypeText);
+        reportLines.push('  选址名称：' + (data.storeName || '-'));
+        reportLines.push('  城市：' + (data.city || '-'));
+        reportLines.push('  地址：' + (data.address || '-'));
+        reportLines.push('  铺位面积：' + (data.area || '-') + ' ㎡');
+        reportLines.push('  月租金：' + (data.rent || '-') + ' 万/月');
+        reportLines.push('  联系人：' + (data.contactName || '-'));
+        reportLines.push('  联系电话：' + (data.contactPhone || '-'));
+        reportLines.push('');
+
+        // 寺院/主店/商圈详细信息
+        if (data.storeType === 'temple' && data.temple) {
+            reportLines.push('【寺院信息】');
+            reportLines.push('  寺院名称：' + (data.temple.templeName || '-'));
+            reportLines.push('  寺院级别：' + (data.temple.templeLevel || '-'));
+            reportLines.push('  平日客流：' + (data.temple.dailyFlow || '-') + ' 人/天');
+            reportLines.push('  旺季客流：' + (data.temple.peakFlow || '-') + ' 人/天');
+            reportLines.push('  淡季月数：' + (data.temple.offSeasonMonths || '-') + ' 个月');
+            reportLines.push('  距寺院距离：' + (data.temple.templeDistance || '-'));
+            reportLines.push('  是否必经之路：' + (data.temple.mainRoute || '-'));
+            reportLines.push('  人均消费：' + (data.temple.avgSpend || '-'));
+            reportLines.push('  周边竞品数：' + (data.temple.competitors || 0) + ' 家');
+            reportLines.push('');
+        } else if (data.storeType === 'shop_in_shop' && data.shopInShop) {
+            reportLines.push('【主店信息】');
+            reportLines.push('  主店名称：' + (data.shopInShop.mainStoreName || '-'));
+            reportLines.push('  主店类型：' + (data.shopInShop.mainStoreType || '-'));
+            reportLines.push('  主店客流：' + (data.shopInShop.mainStoreFlow || '-') + ' 人/天');
+            reportLines.push('  档口位置：' + (data.shopInShop.sisPosition || '-'));
+            reportLines.push('  展示面：' + (data.shopInShop.sisStorefront || '-'));
+            reportLines.push('  周边竞品数：' + (data.shopInShop.sisCompetitors || 0) + ' 家');
+            reportLines.push('');
+        } else if (data.storeType === 'commercial' && data.commercial) {
+            reportLines.push('【商圈信息】');
+            reportLines.push('  商圈名称：' + (data.commercial.bizDistrict || '-'));
+            reportLines.push('  商圈类型：' + (data.commercial.bizType || '-'));
+            reportLines.push('  日均客流：' + (data.commercial.bizFlow || '-') + ' 人/天');
+            reportLines.push('  客群年龄：' + (data.commercial.bizAge || '-'));
+            reportLines.push('  交通距离：' + (data.commercial.transitDist || '-'));
+            reportLines.push('  停车配套：' + (data.commercial.parking || '-'));
+            reportLines.push('  素食竞品：' + (data.commercial.vegCompetitors || 0) + ' 家');
+            reportLines.push('  餐饮竞品：' + (data.commercial.foodCompetitors || 0) + ' 家');
+            reportLines.push('');
+        }
+
+        // 评分明细
+        reportLines.push('【评分明细】');
+        Object.keys(dimGroups).forEach(function(g) {
+            const items = dimGroups[g];
+            const groupTotal = items.reduce(function(s, d) { return s + d.score; }, 0);
+            const groupMax = items.reduce(function(s, d) { return s + d.max; }, 0);
+            reportLines.push('  ▸ ' + g + '（' + groupTotal + '/' + groupMax + '分）');
+            items.forEach(function(d) {
+                const bar = '█'.repeat(Math.round(d.score / d.max * 10)) + '░'.repeat(10 - Math.round(d.score / d.max * 10));
+                reportLines.push('    ' + d.name + '  ' + d.score + '/' + d.max + '  ' + bar);
+            });
+        });
+
+        // 加分项
+        if (scores.bonus > 0 && scores.bonusItems) {
+            reportLines.push('');
+            reportLines.push('  * 加分项：' + scores.bonusItems.map(function(b) { return b.name + ' +' + b.score; }).join('，') + '（共+' + scores.bonus + '分）');
+        }
+        reportLines.push('');
+
+        // 核心优势（从 generateHighlights 返回值提取文本）
+        try {
+            const highlights = generateHighlights(scores, data);
+            if (highlights && highlights.length > 0) {
+                reportLines.push('【该铺位核心优势】');
+                highlights.slice(0, 6).forEach(function(h) {
+                    const tagText = h.tag ? ' [' + h.tag + ']' : '';
+                    reportLines.push('  * ' + stripHtml(h.text) + tagText);
+                });
+                reportLines.push('');
+            }
+        } catch(e) {}
+
+        // 需关注事项（从 generateRisks 返回值提取文本）
+        try {
+            const risks = generateRisks(scores, data);
+            if (risks && risks.length > 0) {
+                reportLines.push('【需关注事项（附品牌解决方案）】');
+                risks.forEach(function(r) {
+                    reportLines.push('  ' + r.icon + ' ' + r.point);
+                    reportLines.push('    → 品牌方案：' + r.solution);
+                    reportLines.push('');
+                });
+            }
+        } catch(e) {}
+
+        // 联系方式
+        reportLines.push('【联系方式】');
+        reportLines.push('  联系人：' + (data.contactName || '-'));
+        reportLines.push('  电话：' + (data.contactPhone || '-'));
+        reportLines.push('  备注：' + (data.notes || '无'));
+        reportLines.push('');
+
+        // 品牌专属声明
+        reportLines.push('──────────────────────────────────────');
+        reportLines.push('  ⚠️ 本报告仅限一叶一世界品牌加盟决策使用');
+        reportLines.push('');
+        reportLines.push('  本选址评估报告依据一叶一世界品牌核心运营模型');
+        reportLines.push('  定制开发，品牌定位、价格带、产品结构不同，评估');
+        reportLines.push('  结论将发生根本性差异。本报告数据及评估结论不适');
+        reportLines.push('  用于任何其他品牌。');
+        reportLines.push('');
+        reportLines.push('  本报告由一叶一世界招商选址团队出具，');
+        reportLines.push('  解释权归品牌总部所有。');
+        reportLines.push('──────────────────────────────────────');
+        reportLines.push('');
+
+        const now = new Date();
+        const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0') + ' ' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+        reportLines.push('  一叶一世界招商选址团队');
+        reportLines.push('  报告时间：' + dateStr);
+        reportLines.push('══════════════════════════════════════');
+
+
+        const summary = reportLines.join('\n');
+
+        // 发送邮件（Web3Forms，纯文本格式报告）
         fetch('https://api.web3forms.com/submit', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
             body: JSON.stringify({
                 access_key: WEB3FORMS_KEY,
-                subject: `🍃 新选址评估：${data.storeName} - ${data.city}`,
+                subject: '新选址评估：' + data.storeName + ' - ' + data.city + '（' + displayScore + '分 ' + levelText + '）',
                 from_name: data.contactName,
                 to: '136472770@qq.com',
                 message: summary,
@@ -3872,14 +4072,13 @@
                 btn.style.background = 'linear-gradient(90deg,#2d7a4f,#3a9a6a)';
                 status.textContent = '';
                 showToast('🎉 选址评估已成功提交！');
-                // 隐藏整个步骤区域和导航，只显示成功提示
+                // 隐藏提交区域，显示成功提示
                 document.getElementById('step5GuestMode').style.display = 'none';
-                document.getElementById('step5AdminMode').style.display = 'none';
                 btn.parentElement.style.display = 'none';
-                document.getElementById('btnGroup').style.display = 'none';
-                document.querySelector('.progress-wrap').style.display = 'none';
                 document.getElementById('successMsg').style.display = '';
                 document.getElementById('successMsg').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // 1秒后弹出密码框，供管理员查看报告
+                setTimeout(function() { showAdminPasswordModal(); }, 1000);
             } else {
                 throw new Error(result.message || '提交失败');
             }
@@ -3898,18 +4097,6 @@
     }
 
     // Init
-    // 检测是否为后台管理员模式（URL 含 ?admin=1 或 ?admin=true）
-    var urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.get('admin') === '1' || urlParams.get('admin') === 'true') {
-        isAdminMode = true;
-        // 显示内部步骤（投资预算、投资回报）
-        document.getElementById('step6').style.display = '';
-        document.getElementById('step7').style.display = '';
-        // 切换 Step 5 为管理员模式（评分报告）
-        document.getElementById('step5GuestMode').style.display = 'none';
-        document.getElementById('step5AdminMode').style.display = '';
-        document.getElementById('btnGroup').style.display = '';
-    }
     updateProgress();
 </script>
 
