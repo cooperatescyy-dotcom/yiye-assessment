@@ -3811,6 +3811,27 @@
 
         const data = collectAllData();
 
+        // 自动计算评分（评估人看不到，但你收到的邮件里有）
+        const scoreInput = collectData();
+        const scores = calcScore(scoreInput);
+        const fullScore = scores.total + (scores.bonus || 0);
+        const displayScore = storeType === 'temple' ? fullScore : scores.total;
+        // 确定等级
+        let levelText = '';
+        if (storeType === 'temple') {
+            if (fullScore >= 90) levelText = '🏆 顶级优质铺位';
+            else if (fullScore >= 80) levelText = '✅ 优质铺位';
+            else levelText = '❌ 不推荐';
+        } else {
+            if (scores.total >= 85) levelText = '🟢 A级铺位';
+            else if (scores.total >= 70) levelText = '🟡 B级铺位';
+            else levelText = '🔴 C级铺位';
+        }
+        data.score = displayScore;
+        data.scoreLevel = levelText;
+        // 各维度得分明细
+        data.scoreBreakdown = scores.dimensions.map(d => `${d.group}/${d.name}: ${d.score}/${d.max}`).join(' | ');
+
         // 构建邮件内容摘要
         const storeTypeMap = { temple: '寺院店', shop_in_shop: '店中店', commercial: '商圈店' };
         const storeTypeText = storeTypeMap[data.storeType] || data.storeType;
@@ -3823,10 +3844,8 @@
             `联系人：${data.contactName}\n` +
             `电话：${data.contactPhone}\n` +
             `地址：${data.address || '-'}\n` +
-            `评分：${data.score} ${data.scoreLevel}\n` +
-            `月净利润：${data.roi?.monthlyProfit || '-'}\n` +
-            `回本周期：${data.roi?.paybackMonths || '-'}\n` +
-            `总投资：${data.budget?.total || '-'}\n` +
+            `评估评分：${displayScore}分 ${levelText}\n` +
+            `评分明细：${data.scoreBreakdown}\n` +
             `备注：${data.notes || '-'}\n\n` +
             `完整数据（JSON）：\n${JSON.stringify(data, null, 2)}`;
 
